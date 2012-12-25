@@ -7,8 +7,9 @@ module Paranoia
     def paranoid? ; true ; end
 
     def only_deleted
-      scoped.tap { |x| x.default_scoped = false }.where("#{self.table_name}.deleted_at is not null")
+      scoped.tap { |x| x.default_scoped = false }.where(:deleted => true)
     end
+    alias :deleted :only_deleted
 
     def with_deleted
       scoped.tap { |x| x.default_scoped = false }
@@ -20,24 +21,23 @@ module Paranoia
   end
 
   def delete
-    update_attribute_or_column(:deleted_at, Time.now) if !deleted? && persisted?
+    update_attribute_or_column(:deleted, true) if !deleted? && persisted?
     freeze
   end
 
   def restore!
-    update_attribute_or_column :deleted_at, nil
+    update_attribute_or_column :deleted, false
   end
 
   def destroyed?
-    !self.deleted_at.nil?
+    !!self.deleted
   end
   alias :deleted? :destroyed?
 
   private
 
-  # Rails 3.1 adds update_column. Rails > 3.2.6 deprecates update_attribute, gone in Rails 4.
   def update_attribute_or_column(*args)
-    respond_to?(:update_column) ? update_column(*args) : update_attribute(*args)
+    update_attribute(*args)
   end
 end
 
@@ -46,7 +46,7 @@ class ActiveRecord::Base
     alias_method :destroy!, :destroy
     alias_method :delete!,  :delete
     include Paranoia
-    default_scope :conditions => { :deleted_at => nil }
+    default_scope :conditions => { :deleted => false }
   end
 
   def self.paranoid? ; false ; end
